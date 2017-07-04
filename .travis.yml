@@ -5,6 +5,10 @@ rust:
   - stable
   - nightly
 
+matrix:
+  allow_failures:
+    - rust: nightly
+
 # load travis-cargo
 before_script:
   - |
@@ -19,3 +23,7 @@ script:
 
 after_success:
   - travis-cargo --only stable doc-upload
+
+env:
+  global:
+    - TRAVIS_CARGO_NIGHTLY_FEATURE=
