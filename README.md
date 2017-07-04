@@ -1,4 +1,6 @@
 # `hyper-router`
+[![Build Status](https://travis-ci.org/ubnt-intrepid/hyper-router.svg?branch=master)](https://travis-ci.org/ubnt-intrepid/hyper-router)
+
 An alternative of router middleware for Hyper 0.11
 
 ## Usage
@@ -8,17 +10,14 @@ See also [simple.rs](examples/simple.rs).
 extern crate hyper;
 extern crate hyper_router;
 extern crate futures;
-extern crate regex;
 
 use hyper::server::{Http, Request, Response};
-use hyper::{Get, Post, StatusCode};
-use hyper::Error as HyperError;
+use hyper::{Get, Post, StatusCode, Error as HyperError};
 use hyper_router::RouteBuilder;
-use futures::Future;
-use futures::future::{self, BoxFuture};
-use regex::Captures;
+use futures::{future, Future};
+use futures::future::BoxFuture;
 
-fn index(_req: &Request, _cap: &Captures) -> BoxFuture<Response, HyperError> {
+fn index(_req: Request, _cap: Vec<String>) -> BoxFuture<Response, HyperError> {
     future::ok(
         Response::new()
             .with_status(StatusCode::Ok)
@@ -26,7 +25,7 @@ fn index(_req: &Request, _cap: &Captures) -> BoxFuture<Response, HyperError> {
     ).boxed()
 }
 
-fn post_index(_req: &Request, cap: &Captures) -> BoxFuture<Response, HyperError> {
+fn post_index(_req: Request, cap: Vec<String>) -> BoxFuture<Response, HyperError> {
     future::ok(
         Response::new()
             .with_status(StatusCode::Ok)
@@ -36,8 +35,8 @@ fn post_index(_req: &Request, cap: &Captures) -> BoxFuture<Response, HyperError>
 
 fn main() {
     let router = RouteBuilder::default()
-        .route(Get, "/", index)
-        .route(Post, r"/([^/]+)", post_index)
+        .get("/", index)
+        .post(r"/([^/]+)", post_index)
         .finish();
 
     let addr = "0.0.0.0:4000".parse().unwrap();
@@ -51,6 +50,5 @@ fn main() {
 hyper = "~0.11"
 hyper-router = { git = "https://github.com/ubnt-intrepid/hyper-router.git" }
 futures = "0.1"
-regex = "0.2"
 ```
 
