@@ -1,37 +1,17 @@
+use std::collections::HashMap;
 use std::io;
 use std::sync::Arc;
+
 use hyper::server::{Service, NewService, Request, Response};
 use hyper::Error as HyperError;
 use hyper::{Method, StatusCode};
 use futures::Future;
 use futures::future::{self, BoxFuture};
-use futures_cpupool::CpuPool;
-use regex::{Regex, Captures};
-
-
-#[derive(Default)]
-pub struct RouteBuilder(RouterInner);
-
-impl RouteBuilder {
-    pub fn route<H: RouteHandler>(mut self, method: Method, path: &str, handler: H) -> Self {
-        let route = Route {
-            method,
-            path: path.to_owned(),
-            path_re: Regex::new(&format!("^{}$", path)).unwrap(),
-            handler: Box::new(handler),
-        };
-        self.0.routes.push(route);
-        self
-    }
-
-    pub fn finish(self) -> Router {
-        Router::new(self.0)
-    }
-}
+use regex::Regex;
 
 
 pub trait RouteHandler: 'static + Send + Sync {
-    fn handle(&self, req: &Request, cap: &Captures) -> BoxFuture<Response, HyperError>;
+    fn handle(&self, req: Request, cap: Vec<String>) -> BoxFuture<Response, HyperError>;
 }
 
 impl<F> RouteHandler for F
@@ -39,39 +19,94 @@ where
     F: 'static
         + Send
         + Sync
-        + Fn(&Request, &Captures) -> BoxFuture<Response, HyperError>,
+        + Fn(Request, Vec<String>) -> BoxFuture<Response, HyperError>,
 {
-    fn handle(&self, req: &Request, cap: &Captures) -> BoxFuture<Response, HyperError> {
+    fn handle(&self, req: Request, cap: Vec<String>) -> BoxFuture<Response, HyperError> {
         (*self)(req, cap)
     }
 }
 
 
-#[allow(dead_code)]
+
+/// Builder object of Router;
+#[derive(Default)]
+pub struct RouteBuilder {
+    routes: HashMap<(String, Method), Box<RouteHandler>>,
+}
+
+impl RouteBuilder {
+    /// Add a new route with given glob pattern.
+    pub fn route<H: RouteHandler>(mut self, method: Method, path: &str, handler: H) -> Self {
+        self.routes.insert(
+            (path.to_owned(), method),
+            Box::new(handler),
+        );
+        self
+    }
+
+    /// Finalize building router.
+    pub fn finish(self) -> Router {
+        let inner = Arc::new(RouterInner {
+            routes: self.routes
+                .into_iter()
+                .map(|((mut pattern, method), handler)| {
+                    if !pattern.starts_with("^") {
+                        pattern = format!("^{}", pattern);
+                    }
+
+                    if !pattern.ends_with("$") {
+                        pattern.push('$');
+                    } else {
+                        if pattern.ends_with("/") {
+                            pattern.push_str("?$");
+                        } else {
+                            pattern.push_str("/?$");
+                        }
+                    }
+
+                    Route {
+                        pattern: Regex::new(&pattern).unwrap(),
+                        method,
+                        handler,
+                    }
+                })
+                .collect(),
+        });
+        Router { inner }
+    }
+}
+
+
 struct Route {
-    path: String,
-    path_re: Regex,
+    pattern: Regex,
     method: Method,
     handler: Box<RouteHandler>,
 }
-
 
 #[derive(Default)]
 struct RouterInner {
     routes: Vec<Route>,
 }
 
-pub struct Router {
-    inner: Arc<RouterInner>,
-    thread_pool: CpuPool,
+impl RouterInner {
+    fn find_matches(&self, path: &str) -> Vec<(&Route, Vec<String>)> {
+        self.routes
+            .iter()
+            .filter_map(|route| {
+                route.pattern.captures(path).map(|cap| {
+                    let cap = cap.iter()
+                        .skip(1)
+                        .map(|s| s.unwrap().as_str().to_owned())
+                        .collect();
+                    (route, cap)
+                })
+            })
+            .collect()
+    }
 }
 
-impl Router {
-    fn new(inner: RouterInner) -> Self {
-        let inner = Arc::new(inner);
-        let thread_pool = CpuPool::new_num_cpus();
-        Router { inner, thread_pool }
-    }
+pub struct Router {
+    inner: Arc<RouterInner>,
 }
 
 impl NewService for Router {
@@ -81,18 +116,14 @@ impl NewService for Router {
     type Instance = RouterService;
 
     fn new_service(&self) -> io::Result<Self::Instance> {
-        Ok(RouterService {
-            inner: self.inner.clone(),
-            thread_pool: self.thread_pool.clone(),
-        })
+        Ok(RouterService { inner: self.inner.clone() })
     }
 }
 
 
-
+/// An asynchronous task executed by hyper.
 pub struct RouterService {
     inner: Arc<RouterInner>,
-    thread_pool: CpuPool,
 }
 
 impl Service for RouterService {
@@ -102,25 +133,15 @@ impl Service for RouterService {
     type Future = BoxFuture<Response, HyperError>;
 
     fn call(&self, req: Request) -> Self::Future {
-        let matched = self.inner
-            .routes
-            .iter()
-            .filter_map(|route| {
-                route.path_re.captures(req.path()).map(
-                    |cap| (cap, route),
-                )
-            })
-            .next();
-        if let Some((cap, m)) = matched {
-            if m.method == *req.method() {
-                self.thread_pool
-                    .spawn(m.handler.handle(&req, &cap))
-                    .boxed()
-            } else {
-                future::ok(Response::new().with_status(StatusCode::MethodNotAllowed)).boxed()
-            }
-        } else {
-            future::ok(Response::new().with_status(StatusCode::NotFound)).boxed()
+        let matches = self.inner.find_matches(req.path());
+        if matches.len() == 0 {
+            return future::ok(Response::new().with_status(StatusCode::NotFound)).boxed();
         }
+        for (route, cap) in matches {
+            if route.method == *req.method() {
+                return route.handler.handle(req, cap);
+            }
+        }
+        future::ok(Response::new().with_status(StatusCode::MethodNotAllowed)).boxed()
     }
 }
