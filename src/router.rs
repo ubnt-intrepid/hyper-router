@@ -27,7 +27,6 @@ where
 }
 
 
-
 /// Builder object of Router;
 #[derive(Default)]
 pub struct RouteBuilder {
@@ -36,12 +35,23 @@ pub struct RouteBuilder {
 
 impl RouteBuilder {
     /// Add a new route with given glob pattern.
-    pub fn route<H: RouteHandler>(mut self, method: Method, path: &str, handler: H) -> Self {
+    pub fn route<H: RouteHandler>(mut self, method: Method, pattern: &str, handler: H) -> Self {
         self.routes.insert(
-            (path.to_owned(), method),
+            (
+                normalize_pattern(pattern).expect("invalid path pattern"),
+                method,
+            ),
             Box::new(handler),
         );
         self
+    }
+
+    pub fn get<H: RouteHandler>(self, pattern: &str, handler: H) -> Self {
+        self.route(Method::Get, pattern, handler)
+    }
+
+    pub fn post<H: RouteHandler>(self, pattern: &str, handler: H) -> Self {
+        self.route(Method::Post, pattern, handler)
     }
 
     /// Finalize building router.
@@ -49,21 +59,7 @@ impl RouteBuilder {
         let inner = Arc::new(RouterInner {
             routes: self.routes
                 .into_iter()
-                .map(|((mut pattern, method), handler)| {
-                    if !pattern.starts_with("^") {
-                        pattern = format!("^{}", pattern);
-                    }
-
-                    if !pattern.ends_with("$") {
-                        pattern.push('$');
-                    } else {
-                        if pattern.ends_with("/") {
-                            pattern.push_str("?$");
-                        } else {
-                            pattern.push_str("/?$");
-                        }
-                    }
-
+                .map(|((pattern, method), handler)| {
                     Route {
                         pattern: Regex::new(&pattern).unwrap(),
                         method,
@@ -143,5 +139,39 @@ impl Service for RouterService {
             }
         }
         future::ok(Response::new().with_status(StatusCode::MethodNotAllowed)).boxed()
+    }
+}
+
+
+
+fn normalize_pattern(pattern: &str) -> Option<String> {
+    match pattern.trim() {
+        "/" => Some("^/$".to_owned()),
+        s if !s.starts_with("^") && !s.starts_with("/") => None,
+        s if !s.starts_with("^") && s.ends_with("$") => Some(format!("^{}", s)),
+        s if !s.starts_with("^") && s.ends_with("/") && s.len() > 1 => Some(format!("^{}?$", s)),
+        s if !s.starts_with("^") => Some(format!("^{}/?$", s)),
+        s if s.ends_with("$") => Some(s.to_owned()),
+        s if s.ends_with("/") && s.len() > 1 => Some(format!("{}?$", s)),
+        s => Some(format!("{}/?$", s)),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::normalize_pattern;
+
+    #[test]
+    fn normalize_cases() {
+        assert_eq!(normalize_pattern("/"), Some("^/$".to_owned()));
+        assert_eq!(
+            normalize_pattern("/path/to"),
+            Some("^/path/to/?$".to_owned())
+        );
+        assert_eq!(
+            normalize_pattern("/path/to/"),
+            Some("^/path/to/?$".to_owned())
+        );
+        assert_eq!(normalize_pattern("a/b"), None);
     }
 }

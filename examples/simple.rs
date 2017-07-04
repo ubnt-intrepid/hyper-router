@@ -4,11 +4,10 @@ extern crate futures;
 extern crate regex;
 
 use hyper::server::{Http, Request, Response};
-use hyper::{Get, Post, StatusCode};
-use hyper::Error as HyperError;
+use hyper::{Error as HyperError, StatusCode};
 use hyper_router::RouteBuilder;
-use futures::{Future, Stream};
-use futures::future::{self, BoxFuture};
+use futures::{future, Future, Stream};
+use futures::future::BoxFuture;
 
 fn index(_req: Request, _cap: Vec<String>) -> BoxFuture<Response, HyperError> {
     future::ok(
@@ -45,9 +44,9 @@ fn show_captures(_req: Request, cap: Vec<String>) -> BoxFuture<Response, HyperEr
 
 fn main() {
     let router = RouteBuilder::default()
-        .route(Get, "/", index)
-        .route(Post, "/", index_post)
-        .route(Get, r"/([^/]+)", show_captures)
+        .get("/", index)
+        .post("/", index_post)
+        .get(r"/([^/]+)", show_captures)
         .finish();
 
     let addr = "0.0.0.0:4000".parse().unwrap();
