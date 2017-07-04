@@ -8,3 +8,6 @@ hyper = "~0.11"
 futures = "~0.1"
 tokio-core = "~0.1"
 regex = "~0.2"
+
+[features]
+unstable = []
