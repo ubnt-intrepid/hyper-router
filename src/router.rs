@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::io;
 use std::sync::Arc;
@@ -29,28 +30,32 @@ where
 
 /// Builder object of Router;
 #[derive(Default)]
-pub struct RouteBuilder {
-    routes: HashMap<(String, Method), Box<RouteHandler>>,
+pub struct RouteBuilder<'a> {
+    routes: HashMap<(Cow<'a, str>, Method), Box<RouteHandler>>,
 }
 
-impl RouteBuilder {
+impl<'a> RouteBuilder<'a> {
     /// Add a new route with given glob pattern.
-    pub fn route<H: RouteHandler>(mut self, method: Method, pattern: &str, handler: H) -> Self {
+    pub fn route<'b: 'a, H: RouteHandler>(
+        mut self,
+        method: Method,
+        pattern: &'b str,
+        handler: H,
+    ) -> Self {
+        let pattern = normalize_pattern(pattern);
+        let handler = Box::new(handler);
         self.routes.insert(
-            (
-                normalize_pattern(pattern).expect("invalid path pattern"),
-                method,
-            ),
-            Box::new(handler),
+            (pattern, method),
+            handler,
         );
         self
     }
 
-    pub fn get<H: RouteHandler>(self, pattern: &str, handler: H) -> Self {
+    pub fn get<'b: 'a, H: RouteHandler>(self, pattern: &'b str, handler: H) -> Self {
         self.route(Method::Get, pattern, handler)
     }
 
-    pub fn post<H: RouteHandler>(self, pattern: &str, handler: H) -> Self {
+    pub fn post<'b: 'a, H: RouteHandler>(self, pattern: &'b str, handler: H) -> Self {
         self.route(Method::Post, pattern, handler)
     }
 
@@ -143,17 +148,15 @@ impl Service for RouterService {
 }
 
 
-
-fn normalize_pattern(pattern: &str) -> Option<String> {
-    match pattern.trim() {
-        "/" => Some("^/$".to_owned()),
-        s if !s.starts_with("^") && !s.starts_with("/") => None,
-        s if !s.starts_with("^") && s.ends_with("$") => Some(format!("^{}", s)),
-        s if !s.starts_with("^") && s.ends_with("/") && s.len() > 1 => Some(format!("^{}?$", s)),
-        s if !s.starts_with("^") => Some(format!("^{}/?$", s)),
-        s if s.ends_with("$") => Some(s.to_owned()),
-        s if s.ends_with("/") && s.len() > 1 => Some(format!("{}?$", s)),
-        s => Some(format!("{}/?$", s)),
+fn normalize_pattern(pattern: &str) -> Cow<str> {
+    let pattern = pattern
+        .trim()
+        .trim_left_matches("^")
+        .trim_right_matches("$")
+        .trim_right_matches("/");
+    match pattern {
+        "" => "^/$".into(),
+        s => format!("^{}/?$", s).into(),
     }
 }
 
@@ -163,15 +166,8 @@ mod tests {
 
     #[test]
     fn normalize_cases() {
-        assert_eq!(normalize_pattern("/"), Some("^/$".to_owned()));
-        assert_eq!(
-            normalize_pattern("/path/to"),
-            Some("^/path/to/?$".to_owned())
-        );
-        assert_eq!(
-            normalize_pattern("/path/to/"),
-            Some("^/path/to/?$".to_owned())
-        );
-        assert_eq!(normalize_pattern("a/b"), None);
+        assert_eq!(normalize_pattern("/"), "^/$");
+        assert_eq!(normalize_pattern("/path/to"), "^/path/to/?$");
+        assert_eq!(normalize_pattern("/path/to/"), "^/path/to/?$");
     }
 }
