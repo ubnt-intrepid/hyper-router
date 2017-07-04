@@ -2,7 +2,7 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 use regex::Regex;
 use hyper::{Method, StatusCode};
-use super::{RouteHandler, RouteRecognizer};
+use super::{RouteHandler, RouteRecognizer, RoutesBuilder};
 
 
 struct RegexRoute {
@@ -14,18 +14,18 @@ struct RegexRoute {
 
 /// Builder for RegexRouteRecognizer.
 #[derive(Default)]
-pub struct RegexRoutesBuilder<'a> {
-    routes: HashMap<(Cow<'a, str>, Method), Box<RouteHandler>>,
+pub struct RegexRoutesBuilder {
+    routes: HashMap<(String, Method), Box<RouteHandler>>,
 }
 
-impl<'a> RegexRoutesBuilder<'a> {
-    /// Add a new route with given glob pattern.
-    pub fn route<'b: 'a, H: RouteHandler>(
-        mut self,
-        method: Method,
-        pattern: &'b str,
-        handler: H,
-    ) -> Self {
+impl RoutesBuilder for RegexRoutesBuilder {
+    type Recognizer = RegexRouteRecognizer;
+
+    fn route<S, H>(mut self, method: Method, pattern: S, handler: H) -> Self
+    where
+        S: Into<String>,
+        H: RouteHandler,
+    {
         let handler = Box::new(handler);
         self.routes.insert(
             (pattern.into(), method),
@@ -34,32 +34,7 @@ impl<'a> RegexRoutesBuilder<'a> {
         self
     }
 
-    pub fn get<'b: 'a, H: RouteHandler>(self, pattern: &'b str, handler: H) -> Self {
-        self.route(Method::Get, pattern, handler)
-    }
-
-    pub fn post<'b: 'a, H: RouteHandler>(self, pattern: &'b str, handler: H) -> Self {
-        self.route(Method::Post, pattern, handler)
-    }
-
-    pub fn put<'b: 'a, H: RouteHandler>(self, pattern: &'b str, handler: H) -> Self {
-        self.route(Method::Put, pattern, handler)
-    }
-
-    pub fn delete<'b: 'a, H: RouteHandler>(self, pattern: &'b str, handler: H) -> Self {
-        self.route(Method::Delete, pattern, handler)
-    }
-
-    pub fn head<'b: 'a, H: RouteHandler>(self, pattern: &'b str, handler: H) -> Self {
-        self.route(Method::Head, pattern, handler)
-    }
-
-    pub fn options<'b: 'a, H: RouteHandler>(self, pattern: &'b str, handler: H) -> Self {
-        self.route(Method::Options, pattern, handler)
-    }
-
-    /// Finalize building router.
-    pub fn finish(self) -> RegexRouteRecognizer {
+    fn finish(self) -> Self::Recognizer {
         RegexRouteRecognizer {
             routes: self.routes
                 .into_iter()
@@ -77,7 +52,6 @@ impl<'a> RegexRoutesBuilder<'a> {
 }
 
 
-#[derive(Default)]
 pub struct RegexRouteRecognizer {
     routes: Vec<RegexRoute>,
 }
@@ -87,13 +61,13 @@ impl RouteRecognizer for RegexRouteRecognizer {
         &self,
         path: &str,
         method: &Method,
-    ) -> Result<(&Box<RouteHandler>, Vec<String>), StatusCode> {
+    ) -> Result<(&RouteHandler, Vec<String>), StatusCode> {
         let mut get_route = None;
         let mut has_other_method = false;
         for route in &self.routes {
             if route.method == *method {
                 if let Some(cap) = get_owned_captures(&route.pattern, path) {
-                    return Ok((&route.handler, cap));
+                    return Ok((&*route.handler, cap));
                 }
             } else {
                 if let Some(cap) = get_owned_captures(&route.pattern, path) {
@@ -101,7 +75,7 @@ impl RouteRecognizer for RegexRouteRecognizer {
                     has_other_method = true;
                     if route.method == Method::Get {
                         if get_route.is_none() {
-                            get_route = Some((&route.handler, cap));
+                            get_route = Some((&*route.handler, cap));
                         }
                     }
                 }

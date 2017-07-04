@@ -5,7 +5,7 @@ extern crate regex;
 
 use hyper::server::{Http, Request, Response};
 use hyper::{Error as HyperError, StatusCode};
-use hyper_router::{RegexRoutesBuilder, Router};
+use hyper_router::{RegexRoutesBuilder, Router, RoutesBuilder};
 use futures::{future, Future, Stream};
 use futures::future::BoxFuture;
 
