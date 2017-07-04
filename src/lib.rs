@@ -7,8 +7,9 @@ pub mod router;
 #[path = "regex.rs"]
 pub mod regex_router;
 
-pub use router::{RoutesBuilder, Router, RouterService};
-pub use regex_router::RegexRouteRecognizer;
+pub use router::{Router, RouterService};
+pub use regex_router::{RegexRoutesBuilder, RegexRouteRecognizer};
+
 
 use hyper::server::{Request, Response};
 use hyper::{Method, StatusCode, Error as HyperError};
