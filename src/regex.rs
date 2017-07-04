@@ -1,6 +1,10 @@
+//!
+//! Defines Regex router
+//!
+
 use std::borrow::Cow;
 use std::collections::HashMap;
-use regex::Regex;
+use _regex::Regex;
 use hyper::{Method, StatusCode};
 use super::{RouteHandler, RouteRecognizer, RoutesBuilder};
 

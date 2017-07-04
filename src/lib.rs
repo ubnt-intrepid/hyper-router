@@ -1,11 +1,10 @@
 extern crate hyper;
 extern crate futures;
 extern crate tokio_core;
-extern crate regex;
+extern crate regex as _regex;
 
-#[path = "regex.rs"]
-pub mod regex_router;
-pub use regex_router::{RegexRoutesBuilder, RegexRouteRecognizer};
+pub mod regex;
+pub use regex::{RegexRoutesBuilder, RegexRouteRecognizer};
 
 use std::io;
 use std::sync::Arc;
