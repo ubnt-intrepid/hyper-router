@@ -46,7 +46,8 @@ fn main() {
     let router = RouteBuilder::default()
         .get("/", index)
         .post("/", index_post)
-        .get(r"/([^/]+)", show_captures)
+        .post("/post", index_post)
+        .get(r"/echo/([^/]+)", show_captures)
         .finish();
 
     let addr = "0.0.0.0:4000".parse().unwrap();

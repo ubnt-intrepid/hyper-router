@@ -90,21 +90,55 @@ struct RouterInner {
 }
 
 impl RouterInner {
-    fn find_matches(&self, path: &str) -> Vec<(&Route, Vec<String>)> {
-        self.routes
-            .iter()
-            .filter_map(|route| {
-                route.pattern.captures(path).map(|cap| {
-                    let cap = cap.iter()
-                        .skip(1)
-                        .map(|s| s.unwrap().as_str().to_owned())
-                        .collect();
-                    (route, cap)
-                })
-            })
-            .collect()
+    fn find_handler(
+        &self,
+        path: &str,
+        method: &Method,
+    ) -> Result<(&Box<RouteHandler>, Vec<String>), StatusCode> {
+        let mut get_route = None;
+        let mut has_other_method = false;
+        for route in &self.routes {
+            if route.method == *method {
+                if let Some(cap) = get_owned_captures(&route.pattern, path) {
+                    return Ok((&route.handler, cap));
+                }
+            } else {
+                if let Some(cap) = get_owned_captures(&route.pattern, path) {
+                    // different method, but matched pattern
+                    has_other_method = true;
+                    if route.method == Method::Get {
+                        if get_route.is_none() {
+                            get_route = Some((&route.handler, cap));
+                        }
+                    }
+                }
+            }
+        }
+        let err_code = if has_other_method {
+            StatusCode::MethodNotAllowed
+        } else {
+            StatusCode::NotFound
+        };
+
+        if *method == Method::Head {
+            get_route.ok_or(err_code)
+        } else {
+            Err(err_code)
+        }
     }
 }
+
+
+fn get_owned_captures(re: &Regex, path: &str) -> Option<Vec<String>> {
+    re.captures(path).map(|cap| {
+        cap.iter()
+            .skip(1)
+            .map(|s| s.unwrap().as_str().to_owned())
+            .collect()
+    })
+}
+
+
 
 pub struct Router {
     inner: Arc<RouterInner>,
@@ -134,16 +168,13 @@ impl Service for RouterService {
     type Future = BoxFuture<Response, HyperError>;
 
     fn call(&self, req: Request) -> Self::Future {
-        let matches = self.inner.find_matches(req.path());
-        if matches.len() == 0 {
-            return future::ok(Response::new().with_status(StatusCode::NotFound)).boxed();
+        match self.inner.find_handler(
+            req.path(),
+            req.method(),
+        ) {
+            Ok((handler, cap)) => handler.handle(req, cap),
+            Err(code) => future::ok(Response::new().with_status(code)).boxed(),
         }
-        for (route, cap) in matches {
-            if route.method == *req.method() {
-                return route.handler.handle(req, cap);
-            }
-        }
-        future::ok(Response::new().with_status(StatusCode::MethodNotAllowed)).boxed()
     }
 }
 
