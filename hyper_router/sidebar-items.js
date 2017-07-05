@@ -1,0 +1,1 @@
+initSidebarItems({"mod":[["regex",""]],"struct":[["Router",""],["RouterService","An asynchronous task executed by hyper."]],"trait":[["RouteHandler",""],["RouteRecognizer",""],["RoutesBuilder",""]]});

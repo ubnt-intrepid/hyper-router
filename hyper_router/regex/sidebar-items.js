@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["RegexRouteRecognizer",""],["RegexRoutesBuilder","Builder for RegexRouteRecognizer."]],"type":[["Captures",""]]});
