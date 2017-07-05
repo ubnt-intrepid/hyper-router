@@ -53,51 +53,57 @@ pub trait RoutesBuilder: Sized {
     /// Create recoginizer
     fn finish(self) -> Self::Recognizer;
 
-    fn get<S: AsRef<str>, H: RouteHandler<<Self::Recognizer as RouteRecognizer>::Captures>>(
-        self,
-        pattern: S,
-        handler: H,
-    ) -> Self {
+    /// Add handler for 'GET' method
+    fn get<S, H>(self, pattern: S, handler: H) -> Self
+    where
+        S: AsRef<str>,
+        H: RouteHandler<<Self::Recognizer as RouteRecognizer>::Captures>,
+    {
         self.route(Method::Get, pattern, handler)
     }
 
-    fn post<S: AsRef<str>, H: RouteHandler<<Self::Recognizer as RouteRecognizer>::Captures>>(
-        self,
-        pattern: S,
-        handler: H,
-    ) -> Self {
+    /// Add handler for 'POST' method
+    fn post<S, H>(self, pattern: S, handler: H) -> Self
+    where
+        S: AsRef<str>,
+        H: RouteHandler<<Self::Recognizer as RouteRecognizer>::Captures>,
+    {
         self.route(Method::Post, pattern, handler)
     }
 
-    fn put<S: AsRef<str>, H: RouteHandler<<Self::Recognizer as RouteRecognizer>::Captures>>(
-        self,
-        pattern: S,
-        handler: H,
-    ) -> Self {
+    /// Add handler for 'PUT' method
+    fn put<S, H>(self, pattern: S, handler: H) -> Self
+    where
+        S: AsRef<str>,
+        H: RouteHandler<<Self::Recognizer as RouteRecognizer>::Captures>,
+    {
         self.route(Method::Put, pattern, handler)
     }
 
-    fn delete<S: AsRef<str>, H: RouteHandler<<Self::Recognizer as RouteRecognizer>::Captures>>(
-        self,
-        pattern: S,
-        handler: H,
-    ) -> Self {
+    /// Add handler for 'DELETE' method
+    fn delete<S, H>(self, pattern: S, handler: H) -> Self
+    where
+        S: AsRef<str>,
+        H: RouteHandler<<Self::Recognizer as RouteRecognizer>::Captures>,
+    {
         self.route(Method::Delete, pattern, handler)
     }
 
-    fn head<S: AsRef<str>, H: RouteHandler<<Self::Recognizer as RouteRecognizer>::Captures>>(
-        self,
-        pattern: S,
-        handler: H,
-    ) -> Self {
+    /// Add handler for 'HEAD' method
+    fn head<S, H>(self, pattern: S, handler: H) -> Self
+    where
+        S: AsRef<str>,
+        H: RouteHandler<<Self::Recognizer as RouteRecognizer>::Captures>,
+    {
         self.route(Method::Head, pattern, handler)
     }
 
-    fn options<S: AsRef<str>, H: RouteHandler<<Self::Recognizer as RouteRecognizer>::Captures>>(
-        self,
-        pattern: S,
-        handler: H,
-    ) -> Self {
+    /// Add handler for 'OPTIONS' method
+    fn options<S, H>(self, pattern: S, handler: H) -> Self
+    where
+        S: AsRef<str>,
+        H: RouteHandler<<Self::Recognizer as RouteRecognizer>::Captures>,
+    {
         self.route(Method::Options, pattern, handler)
     }
 }
