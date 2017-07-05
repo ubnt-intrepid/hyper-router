@@ -6,11 +6,11 @@ extern crate regex;
 use hyper::server::{Http, Request, Response};
 use hyper::{Error as HyperError, StatusCode};
 use hyper_router::{Router, RoutesBuilder};
-use hyper_router::regex::RegexRoutesBuilder;
+use hyper_router::regex::{Captures, RegexRoutesBuilder};
 use futures::{future, Future, Stream};
 use futures::future::BoxFuture;
 
-fn index(_req: Request, _cap: Vec<String>) -> BoxFuture<Response, HyperError> {
+fn index(_req: Request, _cap: Captures) -> BoxFuture<Response, HyperError> {
     future::ok(
         Response::new()
             .with_status(StatusCode::Ok)
@@ -18,7 +18,7 @@ fn index(_req: Request, _cap: Vec<String>) -> BoxFuture<Response, HyperError> {
     ).boxed()
 }
 
-fn index_post(req: Request, _cap: Vec<String>) -> BoxFuture<Response, HyperError> {
+fn index_post(req: Request, _cap: Captures) -> BoxFuture<Response, HyperError> {
     req.body()
         .collect()
         .and_then(|chunks| {
@@ -35,7 +35,7 @@ fn index_post(req: Request, _cap: Vec<String>) -> BoxFuture<Response, HyperError
         .boxed()
 }
 
-fn show_captures(_req: Request, cap: Vec<String>) -> BoxFuture<Response, HyperError> {
+fn show_captures(_req: Request, cap: Captures) -> BoxFuture<Response, HyperError> {
     future::ok(
         Response::new()
             .with_status(StatusCode::Ok)
@@ -48,7 +48,7 @@ fn main() {
         .get("/", index)
         .post("/", index_post)
         .post("/post", index_post)
-        .get(r"/echo/([^/]+)", show_captures)
+        .get(r"/echo/([^/]+)/(?P<hoge>[^/]+)/([^/]+)", show_captures)
         .finish();
     let router = Router::from(recognizer);
 

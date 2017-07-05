@@ -9,9 +9,12 @@ use hyper::{Method, StatusCode};
 use super::{RouteHandler, RouteRecognizer, RoutesBuilder};
 
 
+pub type Captures = Vec<(Option<String>, String)>;
+
+
 struct RegexRoute {
     pattern: Regex,
-    handler: Box<RouteHandler>,
+    handler: Box<RouteHandler<Captures>>,
 }
 
 
@@ -27,7 +30,7 @@ impl RoutesBuilder for RegexRoutesBuilder {
     fn route<S, H>(mut self, method: Method, pattern: S, handler: H) -> Self
     where
         S: AsRef<str>,
-        H: RouteHandler,
+        H: RouteHandler<<Self::Recognizer as RouteRecognizer>::Captures>,
     {
         let pattern = normalize_pattern(pattern.as_ref());
         let pattern = Regex::new(&pattern).unwrap();
@@ -50,11 +53,12 @@ pub struct RegexRouteRecognizer {
 }
 
 impl RouteRecognizer for RegexRouteRecognizer {
+    type Captures = Captures;
     fn recognize(
         &self,
         method: &Method,
         path: &str,
-    ) -> Result<(&RouteHandler, Vec<String>), StatusCode> {
+    ) -> Result<(&RouteHandler<Self::Captures>, Self::Captures), StatusCode> {
         let routes = self.routes.get(method).ok_or(
             StatusCode::NotFound,
         )?;
@@ -69,12 +73,17 @@ impl RouteRecognizer for RegexRouteRecognizer {
 
 
 
-fn get_owned_captures(re: &Regex, path: &str) -> Option<Vec<String>> {
-    re.captures(path).map(|cap| {
-        cap.iter()
-            .skip(1)
-            .map(|s| s.unwrap().as_str().to_owned())
-            .collect()
+fn get_owned_captures(re: &Regex, path: &str) -> Option<Vec<(Option<String>, String)>> {
+    re.captures(path).map(|caps| {
+        let mut res = Vec::with_capacity(caps.len());
+        for (i, name) in re.capture_names().enumerate() {
+            let val = match name {
+                Some(name) => caps.name(name).unwrap(),
+                None => caps.get(i).unwrap(),
+            };
+            res.push((name.map(|s| s.to_owned()), val.as_str().to_owned()));
+        }
+        res
     })
 }
 
