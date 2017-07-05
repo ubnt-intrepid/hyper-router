@@ -11,7 +11,6 @@ use super::{RouteHandler, RouteRecognizer, RoutesBuilder};
 
 struct RegexRoute {
     pattern: Regex,
-    method: Method,
     handler: Box<RouteHandler>,
 }
 
@@ -19,7 +18,7 @@ struct RegexRoute {
 /// Builder for RegexRouteRecognizer.
 #[derive(Default)]
 pub struct RegexRoutesBuilder {
-    routes: HashMap<(String, Method), Box<RouteHandler>>,
+    routes: HashMap<Method, Vec<RegexRoute>>,
 }
 
 impl RoutesBuilder for RegexRoutesBuilder {
@@ -27,37 +26,27 @@ impl RoutesBuilder for RegexRoutesBuilder {
 
     fn route<S, H>(mut self, method: Method, pattern: S, handler: H) -> Self
     where
-        S: Into<String>,
+        S: AsRef<str>,
         H: RouteHandler,
     {
+        let pattern = normalize_pattern(pattern.as_ref());
+        let pattern = Regex::new(&pattern).unwrap();
         let handler = Box::new(handler);
-        self.routes.insert(
-            (pattern.into(), method),
-            handler,
-        );
+        self.routes
+            .entry(method)
+            .or_insert(Vec::new())
+            .push(RegexRoute { pattern, handler });
         self
     }
 
     fn finish(self) -> Self::Recognizer {
-        RegexRouteRecognizer {
-            routes: self.routes
-                .into_iter()
-                .map(|((pattern, method), handler)| {
-                    let pattern = normalize_pattern(&pattern);
-                    RegexRoute {
-                        pattern: Regex::new(&pattern).unwrap(),
-                        method,
-                        handler,
-                    }
-                })
-                .collect(),
-        }
+        RegexRouteRecognizer { routes: self.routes }
     }
 }
 
 
 pub struct RegexRouteRecognizer {
-    routes: Vec<RegexRoute>,
+    routes: HashMap<Method, Vec<RegexRoute>>,
 }
 
 impl RouteRecognizer for RegexRouteRecognizer {
@@ -66,36 +55,15 @@ impl RouteRecognizer for RegexRouteRecognizer {
         method: &Method,
         path: &str,
     ) -> Result<(&RouteHandler, Vec<String>), StatusCode> {
-        let mut get_route = None;
-        let mut has_other_method = false;
-        for route in &self.routes {
-            if route.method == *method {
-                if let Some(cap) = get_owned_captures(&route.pattern, path) {
-                    return Ok((&*route.handler, cap));
-                }
-            } else {
-                if let Some(cap) = get_owned_captures(&route.pattern, path) {
-                    // different method, but matched pattern
-                    has_other_method = true;
-                    if route.method == Method::Get {
-                        if get_route.is_none() {
-                            get_route = Some((&*route.handler, cap));
-                        }
-                    }
-                }
+        let routes = self.routes.get(method).ok_or(
+            StatusCode::NotFound,
+        )?;
+        for route in routes {
+            if let Some(caps) = get_owned_captures(&route.pattern, path) {
+                return Ok((&*route.handler, caps));
             }
         }
-        let err_code = if has_other_method {
-            StatusCode::MethodNotAllowed
-        } else {
-            StatusCode::NotFound
-        };
-
-        if *method == Method::Head {
-            get_route.ok_or(err_code)
-        } else {
-            Err(err_code)
-        }
+        Err(StatusCode::NotFound)
     }
 }
 

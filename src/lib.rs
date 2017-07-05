@@ -47,33 +47,33 @@ pub trait RoutesBuilder: Sized {
     /// Add a new route with given glob pattern.
     fn route<S, H>(self, method: Method, pattern: S, handler: H) -> Self
     where
-        S: Into<String>,
+        S: AsRef<str>,
         H: RouteHandler;
 
     /// Create recoginizer
     fn finish(self) -> Self::Recognizer;
 
-    fn get<S: Into<String>, H: RouteHandler>(self, pattern: S, handler: H) -> Self {
+    fn get<S: AsRef<str>, H: RouteHandler>(self, pattern: S, handler: H) -> Self {
         self.route(Method::Get, pattern, handler)
     }
 
-    fn post<S: Into<String>, H: RouteHandler>(self, pattern: S, handler: H) -> Self {
+    fn post<S: AsRef<str>, H: RouteHandler>(self, pattern: S, handler: H) -> Self {
         self.route(Method::Post, pattern, handler)
     }
 
-    fn put<S: Into<String>, H: RouteHandler>(self, pattern: S, handler: H) -> Self {
+    fn put<S: AsRef<str>, H: RouteHandler>(self, pattern: S, handler: H) -> Self {
         self.route(Method::Put, pattern, handler)
     }
 
-    fn delete<S: Into<String>, H: RouteHandler>(self, pattern: S, handler: H) -> Self {
+    fn delete<S: AsRef<str>, H: RouteHandler>(self, pattern: S, handler: H) -> Self {
         self.route(Method::Delete, pattern, handler)
     }
 
-    fn head<S: Into<String>, H: RouteHandler>(self, pattern: S, handler: H) -> Self {
+    fn head<S: AsRef<str>, H: RouteHandler>(self, pattern: S, handler: H) -> Self {
         self.route(Method::Head, pattern, handler)
     }
 
-    fn options<S: Into<String>, H: RouteHandler>(self, pattern: S, handler: H) -> Self {
+    fn options<S: AsRef<str>, H: RouteHandler>(self, pattern: S, handler: H) -> Self {
         self.route(Method::Options, pattern, handler)
     }
 }
