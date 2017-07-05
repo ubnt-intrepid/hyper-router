@@ -33,10 +33,10 @@ where
 
 
 pub trait RouteRecognizer {
-    fn find_handler(
+    fn recognize(
         &self,
-        path: &str,
         method: &Method,
+        path: &str,
     ) -> Result<(&RouteHandler, Vec<String>), StatusCode>;
 }
 
@@ -120,10 +120,9 @@ where
     type Future = BoxFuture<Response, HyperError>;
 
     fn call(&self, req: Request) -> Self::Future {
-        match self.inner.find_handler(
-            req.path(),
-            req.method(),
-        ) {
+        let method = req.method().clone();
+        let path = req.path().to_owned();
+        match self.inner.recognize(&method, &path) {
             Ok((handler, cap)) => handler.handle(req, cap),
             Err(code) => future::ok(Response::new().with_status(code)).boxed(),
         }

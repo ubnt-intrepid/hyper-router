@@ -61,10 +61,10 @@ pub struct RegexRouteRecognizer {
 }
 
 impl RouteRecognizer for RegexRouteRecognizer {
-    fn find_handler(
+    fn recognize(
         &self,
-        path: &str,
         method: &Method,
+        path: &str,
     ) -> Result<(&RouteHandler, Vec<String>), StatusCode> {
         let mut get_route = None;
         let mut has_other_method = false;
