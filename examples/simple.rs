@@ -5,7 +5,8 @@ extern crate regex;
 
 use hyper::server::{Http, Request, Response};
 use hyper::{Error as HyperError, StatusCode};
-use hyper_router::{RegexRoutesBuilder, Router, RoutesBuilder};
+use hyper_router::{Router, RoutesBuilder};
+use hyper_router::regex::RegexRoutesBuilder;
 use futures::{future, Future, Stream};
 use futures::future::BoxFuture;
 
@@ -49,7 +50,7 @@ fn main() {
         .post("/post", index_post)
         .get(r"/echo/([^/]+)", show_captures)
         .finish();
-    let router = Router::new(recognizer);
+    let router = Router::from(recognizer);
 
     let addr = "0.0.0.0:4000".parse().unwrap();
     let server = Http::new().bind(&addr, router).unwrap();

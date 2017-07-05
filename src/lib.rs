@@ -4,7 +4,6 @@ extern crate tokio_core;
 extern crate regex as _regex;
 
 pub mod regex;
-pub use regex::{RegexRoutesBuilder, RegexRouteRecognizer};
 
 use std::io;
 use std::sync::Arc;
@@ -84,8 +83,8 @@ pub struct Router<R: RouteRecognizer> {
     inner: Arc<R>,
 }
 
-impl<R: RouteRecognizer> Router<R> {
-    pub fn new(recognizer: R) -> Self {
+impl<R: RouteRecognizer> From<R> for Router<R> {
+    fn from(recognizer: R) -> Self {
         Router { inner: Arc::new(recognizer) }
     }
 }
